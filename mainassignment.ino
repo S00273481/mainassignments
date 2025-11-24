@@ -10,8 +10,8 @@
 #include "arduino_secrets.h"   // Wi-Fi credentials
 
 
-char ssid[] = "YOUR_WIFI_NAME";
-char pass[] = "YOUR_WIFI_PASSWORD";
+char ssid[] = "arduino_secrets.h";
+char pass[] = "tvqxskzf";
 
 // Pins for UNO R4 WiFi (use numbers, not Dx)
 #define BUZZER 5
