@@ -1,57 +1,89 @@
+#define BLYNK_TEMPLATE_ID "YOUR_TEMPLATE_ID"
+#define BLYNK_TEMPLATE_NAME "Fire Alarm System"
+#define BLYNK_AUTH_TOKEN "YOUR_BLYNK_AUTH_TOKEN"
+
+#include <WiFiS3.h>          
+#include <WiFiSSLClient.h>
+#include <BlynkSimpleWifi.h>   // IMPORTANT: Correct for UNO R4 WiFi
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include "arduino_secrets.h"   // Wi-Fi credentials
 
+
+char ssid[] = "YOUR_WIFI_NAME";
+char pass[] = "YOUR_WIFI_PASSWORD";
+
+// Pins for UNO R4 WiFi (use numbers, not Dx)
 #define BUZZER 5
+#define LED_PIN 6
 #define LIGHT_SENSOR_PIN A0
-#define LED_PIN A3
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
+bool fireDetected = false;
+
 void setup() {
   Serial.begin(9600);
-  Serial.println("Starting setup...");
 
   pinMode(BUZZER, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
 
-  Serial.println("Pins set. Initializing LCD...");
-
   lcd.init();
   lcd.backlight();
-  Serial.println("LCD initialized.");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting...");
+
+  // Connect to WiFi + Blynk Cloud
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
 
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Debug Mode");
+  lcd.print("System Ready");
   delay(1000);
-  lcd.clear();
-
-  Serial.println("Setup complete.");
 }
 
 void loop() {
-  Serial.println("Loop running...");
-  int lightValue = analogRead(LIGHT_SENSOR_PIN);
+  Blynk.run();
 
-  Serial.print("Light sensor value: ");
-  Serial.println(lightValue);
+  int sensorValue = analogRead(LIGHT_SENSOR_PIN);
+  Serial.print("Light value: ");
+  Serial.println(sensorValue);
 
   int threshold = 500;
 
-  if (lightValue < threshold) {
-    Serial.println("Dark detected.");
+  // FIRE DETECTED
+  if (sensorValue < threshold) {
+    if (!fireDetected) {
+      fireDetected = true;
 
-    tone(BUZZER, 1000);
+      Blynk.virtualWrite(V1, "🔥 FIRE DETECTED");
+      Blynk.logEvent("fire_alert", "🔥 FIRE DETECTED - immediate danger!");
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("FIRE DETECTED!");
+
+      tone(BUZZER, 1000);
+    }
+
     digitalWrite(LED_PIN, HIGH);
-    delay(250);
+    delay(150);
     digitalWrite(LED_PIN, LOW);
-    delay(250);
+    delay(150);
 
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Dark");
   } else {
-    Serial.println("Bright detected.");
+
+    // SAFE
+    if (fireDetected) {
+      fireDetected = false;
+
+      Blynk.virtualWrite(V1, "Safe");
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Safe");
+    }
 
     noTone(BUZZER);
     digitalWrite(LED_PIN, LOW);
@@ -59,7 +91,8 @@ void loop() {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Bright");
+    delay(300);
   }
 
-  delay(200);
+  delay(100);
 }
