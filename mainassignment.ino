@@ -132,4 +132,4 @@ void loop() {
   lcd.print(alarmEnabled ? "ON " : "OFF");
 
   delay(20000); // ThingSpeak 15s minimum
-}hi
+}
