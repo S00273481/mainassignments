@@ -2,26 +2,71 @@
 #include <LiquidCrystal_I2C.h>
 #include <WiFiS3.h>
 #include <ArduinoHttpClient.h>
+#include <math.h>
 
 // ------------------- Pins -------------------
 #define BUZZER 5
 #define LIGHT_SENSOR_PIN A0
+#define TEMP_SENSOR_PIN A1      // <-- Grove Temperature Sensor
 #define LED_PIN A3
 
 // ------------------- LCD ---------------------
-LiquidCrystal_I2C lcd(0x27, 16, 2);   // If LCD does not work, change to 0x3F
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // ------------------- WiFi --------------------
-char ssid[] = "arduino_secrets.h";         // CHANGE THIS
-char pass[] = "tvqxskzf";     // CHANGE THIS
+// CHANGE THESE
+char ssid[] = "IOT-MPSK";
+char pass[] = "wlzjlzns";
 
 // ------------------- ThingSpeak --------------------
 const char tsServer[] = "api.thingspeak.com";
 const int tsPort = 80;
-String writeAPIKey = "CMKA2UURC5N9FDJ4";   // CHANGE THIS
+
+// CHANGE THIS
+String writeAPIKey = "CMKA2UURC5N9FDJ4";
 
 WiFiClient wifi;
 HttpClient tsClient(wifi, tsServer, tsPort);
+
+// -----------------------------------------------------------------------------
+// 🌡️ Read Grove Temperature (°C)
+// -----------------------------------------------------------------------------
+float readGroveTemperatureC(int pin) {
+  int sensorValue = analogRead(pin);
+  if (sensorValue == 0) return NAN;  // Avoid division by zero
+
+  // Convert ADC reading to resistance
+  float resistance = (1023.0 - sensorValue) * 10000.0 / sensorValue;
+
+  // Apply B-parameter formula
+  const float B = 3975.0;
+  const float R0 = 10000.0;
+  const float T0 = 298.15;  // 25°C in Kelvin
+
+  float temperatureK = 1.0 / ((1.0 / T0) + (1.0 / B) * log(resistance / R0));
+  return temperatureK - 273.15;
+}
+
+// ------------------- ThingSpeak Function --------------------
+void sendToThingSpeak(int light, float temp) {
+
+  String url = "/update?api_key=" + writeAPIKey +
+               "&field1=" + String(light) +
+               "&field2=" + String(temp, 2);
+
+  tsClient.beginRequest();
+  tsClient.get(url);
+  tsClient.endRequest();
+
+  int status = tsClient.responseStatusCode();
+  Serial.print("ThingSpeak Status: ");
+  Serial.println(status);
+
+  String response = tsClient.responseBody();
+  Serial.println(response);
+
+  tsClient.stop();
+}
 
 // ------------------- Setup --------------------
 void setup() {
@@ -41,7 +86,7 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("Connecting WiFi");
 
-  // Connect WiFi
+  // WiFi Connect
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED) {
     delay(300);
@@ -55,36 +100,25 @@ void setup() {
   lcd.clear();
   lcd.print("WiFi Connected");
   delay(1000);
-
   lcd.clear();
-  lcd.print("Light Sensor");
-}
-
-// ------------------- ThingSpeak Function --------------------
-void sendToThingSpeak(int value) {
-  String url = "/update?api_key=" + writeAPIKey + "&field1=" + String(value);
-
-  tsClient.beginRequest();
-  tsClient.get(url);
-  tsClient.endRequest();
-
-  int status = tsClient.responseStatusCode();
-  Serial.print("ThingSpeak Status: ");
-  Serial.println(status);
-
-  tsClient.stop();
+  lcd.print("Sensors Ready");
+  delay(800);
 }
 
 // ------------------- Loop --------------------
 void loop() {
-  Serial.println("Loop running...");
 
+  // Read sensors
   int lightValue = analogRead(LIGHT_SENSOR_PIN);
+  float tempC = readGroveTemperatureC(TEMP_SENSOR_PIN);
+
   Serial.print("Light value: ");
   Serial.println(lightValue);
+  Serial.print("Temp C: ");
+  Serial.println(tempC);
 
-  // Send value to ThingSpeak
-  sendToThingSpeak(lightValue);
+  // Send data to ThingSpeak
+  sendToThingSpeak(lightValue, tempC);
 
   int threshold = 500;
 
@@ -100,7 +134,9 @@ void loop() {
 
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Dark");
+    lcd.print("Dark | ");
+    lcd.print(tempC, 1);
+    lcd.print("C");
   }
 
   // ---------------- BRIGHT ----------------
@@ -112,8 +148,11 @@ void loop() {
 
     lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print("Bright");
+    lcd.print("Bright | ");
+    lcd.print(tempC, 1);
+    lcd.print("C");
   }
 
-  delay(20000);   // ThingSpeak requires 15s minimum between updates
+  delay(20000);  // 20s delay (ThingSpeak minimum is 15s)
 }
+
