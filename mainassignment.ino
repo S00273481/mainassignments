@@ -16,7 +16,7 @@ rgb_lcd lcd;
 
 // ------------------- WiFi -------------------
 char ssid[] = "IOT-MPSK";
-char pass[] = "wlzjlzns";
+char pass[] = "tnkpnlhk";
 
 // ------------------- ThingSpeak -------------------
 const char tsServer[] = "api.thingspeak.com";
@@ -103,12 +103,12 @@ void loop() {
     lcd.setCursor(0, 0);
     lcd.print("Alarm ");
     lcd.print(alarmEnabled ? "ON" : "OFF");
-    delay(500); // Debounce
+    delay(1000); // Debounce
   }
   lastButtonState = buttonState;
 
   // --- Alarm: control buzzer + LED ---
-  if (alarmEnabled) {
+  if (alarmEnabled  && lightValue < 500) {
     digitalWrite(LED_PIN, HIGH);
     tone(BUZZER, 1000); // 1kHz
   } else {
@@ -131,5 +131,5 @@ void loop() {
   lcd.print("Alarm:");
   lcd.print(alarmEnabled ? "ON " : "OFF");
 
-  delay(20000); // ThingSpeak 15s minimum
+  delay(2000); // ThingSpeak 15s minimum
 }
